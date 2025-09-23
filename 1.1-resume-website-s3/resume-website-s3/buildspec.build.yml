@@ -14,7 +14,7 @@ phases:
       - cp "$SRC/styles.css" "dist/style.css"
       - sed 's|\${backend_api_url}|$API_BASE_URL|g' "$SRC/index.html.tpl" > "dist/index.html"
       - sed "s|\${backend_api_url}|$API_BASE_URL|g" "$SRC/scripts.js" > "dist/script.js"
-arartifacts:
+artifacts:
   files:
     - '**/*'
   base-directory: dist

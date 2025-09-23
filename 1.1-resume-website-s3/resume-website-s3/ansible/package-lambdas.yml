@@ -1,0 +1,35 @@
+---
+- name: Repackage Lambda functions with dependencies
+  hosts: localhost
+  vars:
+    lambda_dirs:
+      - ../lambda/visitor-counter
+      - ../lambda/contact-form
+  tasks:
+    - name: Install npm dependencies
+      ansible.builtin.command:
+        cmd: npm install
+        chdir: "{{ item }}"
+      loop: "{{ lambda_dirs }}"
+
+    - name: Create deployment zip
+      ansible.builtin.command:
+        cmd: |
+          powershell -Command "Compress-Archive -Path * -DestinationPath {{ item }}/{{ item | basename }}.zip -Force"
+        chdir: "{{ item }}"
+      loop: "{{ lambda_dirs }}"
+      when: ansible_os_family == 'Windows'
+
+    - name: Create deployment zip (Linux/Mac)
+      ansible.builtin.command:
+        cmd: zip -r {{ item | basename }}.zip .
+        chdir: "{{ item }}"
+      loop: "{{ lambda_dirs }}"
+      when: ansible_os_family != 'Windows'
+
+    - name: Move zip to parent lambda directory
+      ansible.builtin.command:
+        cmd: mv {{ item | basename }}.zip ../
+        chdir: "{{ item }}"
+      loop: "{{ lambda_dirs }}"
+      when: ansible_os_family != 'Windows'

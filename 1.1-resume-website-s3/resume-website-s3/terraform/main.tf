@@ -1,3 +1,4 @@
+
 terraform {
   required_providers {
     aws = {
@@ -13,6 +14,233 @@ provider "aws" {
 
 resource "random_id" "bucket_suffix" {
   byte_length = 4
+}
+
+
+# IAM role for API Gateway to push logs to CloudWatch
+resource "aws_iam_role" "apigw_cloudwatch_role" {
+  name = "apigw_cloudwatch_logs_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "apigateway.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# Attach the managed policy for API Gateway logging
+resource "aws_iam_role_policy_attachment" "apigw_cloudwatch_logs" {
+  role       = aws_iam_role.apigw_cloudwatch_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+# Set the CloudWatch Logs role for API Gateway
+resource "aws_api_gateway_account" "account" {
+  cloudwatch_role_arn = aws_iam_role.apigw_cloudwatch_role.arn
+}
+# Set log retention for Lambda log groups
+resource "aws_cloudwatch_log_group" "lambda_visitor_counter" {
+  name              = "/aws/lambda/${aws_lambda_function.visitor_counter.function_name}"
+  retention_in_days = 30
+}
+
+resource "aws_cloudwatch_log_group" "lambda_contact_form" {
+  name              = "/aws/lambda/${aws_lambda_function.contact_form.function_name}"
+  retention_in_days = 30
+}
+
+# (API Gateway log group already has retention set)
+# SNS topic for CloudWatch alarm notifications
+resource "aws_sns_topic" "alarm_notifications" {
+  name = "resume-website-alarms"
+}
+
+#Subscribe your email
+resource "aws_sns_topic_subscription" "alarm_email" {
+  topic_arn = aws_sns_topic.alarm_notifications.arn
+  protocol  = "email"
+  endpoint  = var.contact_email
+}
+
+# Dedicated S3 bucket for access logs
+resource "aws_s3_bucket" "access_logs" {
+  bucket = "resume-website-access-logs-${random_id.bucket_suffix.hex}"
+  # acl    = "log-delivery-write"
+  force_destroy = true
+  tags = {
+    Project     = "ResumeWebsite"
+    Environment = "Production"
+    Purpose     = "AccessLogs"
+  }
+}
+
+# Enable S3 bucket access logging
+resource "aws_s3_bucket_logging" "resume_website_logging" {
+  bucket = aws_s3_bucket.resume_website.id
+  target_bucket = aws_s3_bucket.access_logs.id
+  target_prefix = "s3/"
+}
+
+# CloudWatch Log Group for API Gateway access logs
+resource "aws_cloudwatch_log_group" "apigw_access_logs" {
+  name              = "/aws/apigateway/resume-api-access-logs"
+  retention_in_days = 30
+}
+
+# CloudWatch Alarms for Lambda and custom metrics
+resource "aws_cloudwatch_metric_alarm" "lambda_visitor_error" {
+  alarm_name          = "VisitorCounterLambdaErrors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Alarm if the visitor-counter Lambda has any errors."
+  dimensions = {
+    FunctionName = aws_lambda_function.visitor_counter.function_name
+  }
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_visitor_duration" {
+  alarm_name          = "VisitorCounterLambdaDuration"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Duration"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 2000 # 2 seconds
+  alarm_description   = "Alarm if the visitor-counter Lambda duration exceeds 2s."
+  dimensions = {
+    FunctionName = aws_lambda_function.visitor_counter.function_name
+  }
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_visitor_throttle" {
+  alarm_name          = "VisitorCounterLambdaThrottles"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Throttles"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Alarm if the visitor-counter Lambda is throttled."
+  dimensions = {
+    FunctionName = aws_lambda_function.visitor_counter.function_name
+  }
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_contact_error" {
+  alarm_name          = "ContactFormLambdaErrors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "errors"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Alarm if the contact-form Lambda has any errors."
+  dimensions = {
+    FunctionName = aws_lambda_function.contact_form.function_name
+  }
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_contact_duration" {
+  alarm_name          = "ContactFormLambdaDuration"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Duration"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Average"
+  threshold           = 2000 # 2 seconds
+  alarm_description   = "Alarm if the contact-form Lambda duration exceeds 2s."
+  dimensions = {
+    FunctionName = aws_lambda_function.contact_form.function_name
+  }
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "lambda_contact_throttle" {
+  alarm_name          = "ContactFormLambdaThrottles"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Throttles"
+  namespace           = "AWS/Lambda"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Alarm if the contact-form Lambda is throttled."
+  dimensions = {
+    FunctionName = aws_lambda_function.contact_form.function_name
+  }
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "custom_visitor_success" {
+  alarm_name          = "VisitorCounterCustomSuccessLow"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "VisitorCounterSuccess"
+  namespace           = "ResumeWebsite"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "Alarm if there are no successful visitor counter events in 5 minutes."
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "custom_visitor_error" {
+  alarm_name          = "VisitorCounterCustomError"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "VisitorCounterError"
+  namespace           = "ResumeWebsite"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Alarm if there are any visitor counter errors in 5 minutes."
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "custom_contact_success" {
+  alarm_name          = "ContactFormCustomSuccessLow"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ContactFormSuccess"
+  namespace           = "ResumeWebsite"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "Alarm if there are no successful contact form events in 5 minutes."
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "custom_contact_error" {
+  alarm_name          = "ContactFormCustomError"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ContactFormError"
+  namespace           = "ResumeWebsite"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Alarm if there are any contact form errors in 5 minutes."
+  alarm_actions = [aws_sns_topic.alarm_notifications.arn]
 }
 
 # Remove the public read policy data source and IAM policy resources for putting bucket policy,
@@ -73,44 +301,14 @@ resource "aws_s3_bucket_public_access_block" "resume_website" {
   restrict_public_buckets = true
 }
 
-# resource "random_id" "index_version" {
-#   byte_length = 4
-# }
-
-# #Update the CloudFront distribution to use the S3 bucket's regional endpoint and OAC
-# resource "aws_s3_object" "index_file" {
-#   bucket = aws_s3_bucket.resume_website.id
-#   key    = "index-${random_id.index_version.hex}.html"
-#   content = templatefile("${path.module}/../frontend/index.html.tpl", {
-#     backend_api_url = aws_api_gateway_deployment.resume_api_deployment.invoke_url
-#     index_version   = random_id.index_version.hex
-
-#     # backend_api_url = module.resume_api.api_base_url
-#   })
-#   content_type = "text/html"
-# }
-
-# resource "aws_s3_object" "styles_css" {
-#   bucket       = aws_s3_bucket.resume_website.id
-#   key          = "styles-${random_id.index_version.hex}.css"
-#   content      = file("${path.module}/../frontend/styles.css")
-#   content_type = "text/css"
-# }
-
-# resource "aws_s3_object" "scripts_js" {
-#   bucket       = aws_s3_bucket.resume_website.id
-#   key          = "scripts-${random_id.index_version.hex}.js"
-#   content      = templatefile("${path.module}/../frontend/scripts.js", {
-#     backend_api_url = aws_api_gateway_deployment.resume_api_deployment.invoke_url
-#   })
-#   content_type = "application/javascript"
-# }
-
 #Update the CloudFront distribution to use the S3 bucket's regional endpoint and OAC
 resource "aws_cloudfront_distribution" "resume_distribution" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html"
+
+
+  # All CloudFront real-time logging resources are now at the top level.
 
   origin {
     domain_name              = aws_s3_bucket.resume_website.bucket_regional_domain_name
@@ -126,6 +324,8 @@ resource "aws_cloudfront_distribution" "resume_distribution" {
     allowed_methods  = ["GET", "HEAD", "OPTIONS"]
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = "S3-resume-website"
+    realtime_log_config_arn = aws_cloudfront_realtime_log_config.resume_logs.arn
+
 
     forwarded_values {
       query_string = false
@@ -190,6 +390,10 @@ resource "aws_lambda_function" "visitor_counter" {
     Environment = "Production"
   }
 
+  tracing_config {
+    mode = "Active"
+  }
+
 }
 
 resource "aws_iam_role" "lambda_role" {
@@ -214,10 +418,6 @@ resource "aws_iam_role" "lambda_role" {
   }
 }
 
-# resource "aws_iam_role_policy_attachment" "lambda_dynamo" {
-#   role       = aws_iam_role.lambda_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
-# }
 
 resource "aws_iam_policy" "lambda_dynamodb_least_privilege" {
   name        = "lambda-dynamodb-least-privilege"
@@ -379,7 +579,7 @@ resource "aws_api_gateway_method_response" "contact_post_cors" {
   http_method = "POST"
   status_code = "200"
 
-  depends_on = [aws_api_gateway_method_response.contact_post_cors]
+
 
   response_models = {
     "application/json" = "Empty"
@@ -391,6 +591,8 @@ resource "aws_api_gateway_method_response" "contact_post_cors" {
     "method.response.header.Access-Control-Allow-Methods" = true
   }
 }
+
+
 
 resource "aws_api_gateway_integration_response" "contact_post_cors" {
   rest_api_id = aws_api_gateway_rest_api.resume_api.id
@@ -427,11 +629,53 @@ resource "aws_lambda_permission" "apigw_contact_lambda" {
 }
 
 resource "aws_api_gateway_deployment" "resume_api_deployment" {
-  depends_on = [aws_api_gateway_integration.visitor_integration, aws_api_gateway_integration.contact_integration]
+  depends_on = [
+    aws_api_gateway_integration.visitor_integration,
+    aws_api_gateway_integration.contact_integration,
+    aws_api_gateway_method.contact_post,
+    aws_api_gateway_method_response.contact_post_cors,
+    aws_api_gateway_integration_response.contact_post_cors
+  ]
 
   rest_api_id = aws_api_gateway_rest_api.resume_api.id
   stage_name  = "prod"
+  variables = {}
+  # Force redeployment on every apply
+  triggers = {
+    redeployment = timestamp()
+  }
+
 }
+
+# Add a stage resource for API Gateway with access logging
+resource "aws_api_gateway_stage" "prod" {
+  depends_on = [aws_api_gateway_account.account]
+  stage_name    = "prod"
+  rest_api_id   = aws_api_gateway_rest_api.resume_api.id
+  deployment_id = aws_api_gateway_deployment.resume_api_deployment.id
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.apigw_access_logs.arn
+    format = jsonencode({
+      requestId               = "$context.requestId",
+      ip                      = "$context.identity.sourceIp",
+      caller                  = "$context.identity.caller",
+      user                    = "$context.identity.user",
+      requestTime             = "$context.requestTime",
+      httpMethod              = "$context.httpMethod",
+      resourcePath            = "$context.resourcePath",
+      status                  = "$context.status",
+      protocol                = "$context.protocol",
+      responseLength          = "$context.responseLength",
+      integrationErrorMessage = "$context.integration.error"
+    })
+  }
+
+  variables = {}
+
+  xray_tracing_enabled = true
+}
+
 
 # Store the API base URL in SSM Parameter Store for CI/CD consumption
 resource "aws_ssm_parameter" "api_base_url" {
@@ -467,6 +711,35 @@ resource "aws_lambda_function" "contact_form" {
     Project     = "ResumeWebsite"
     Environment = "Production"
   }
+
+  tracing_config {
+    mode = "Active"
+  }
+}
+
+# IAM policy for X-Ray tracing
+resource "aws_iam_policy" "lambda_xray" {
+  name        = "lambda-xray-policy"
+  description = "Allow Lambda to write X-Ray trace data"
+  policy      = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Attach X-Ray policy to Lambda execution role
+resource "aws_iam_role_policy_attachment" "lambda_xray" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_xray.arn
 }
 
 resource "aws_cloudwatch_dashboard" "resume_dashboard" {
@@ -891,4 +1164,73 @@ resource "aws_codepipeline" "resume_pipeline" {
     Project     = "ResumeWebsite"
     Environment = "Production"
   }
+}
+
+# --- CloudFront Real-Time Logging via Kinesis Data Stream ---
+resource "aws_kinesis_stream" "cloudfront_realtime_logs" {
+  name             = "cloudfront-realtime-logs"
+  shard_count      = 1
+  retention_period = 24
+  shard_level_metrics = ["IncomingBytes", "OutgoingBytes"]
+  tags = {
+    Project     = "ResumeWebsite"
+    Environment = "Production"
+  }
+}
+
+resource "aws_cloudfront_realtime_log_config" "resume_logs" {
+  name   = "resume-website-realtime-logs"
+  fields = [
+    "timestamp",
+    "c-ip",
+    "cs-method",
+    "cs-uri-stem",
+    "sc-status",
+    "x-edge-location",
+    "sc-bytes",
+    "time-to-first-byte",
+    "x-edge-request-id"
+  ]
+  sampling_rate = 100
+  endpoint {
+    stream_type = "Kinesis"
+    kinesis_stream_config {
+      role_arn   = aws_iam_role.cloudfront_logs_role.arn
+      stream_arn = aws_kinesis_stream.cloudfront_realtime_logs.arn
+    }
+  }
+}
+
+resource "aws_iam_role" "cloudfront_logs_role" {
+  name = "cloudfront-logs-to-kinesis"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "cloudfront_logs_policy" {
+  name = "cloudfront-logs-to-kinesis-policy"
+  role = aws_iam_role.cloudfront_logs_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "kinesis:PutRecord",
+          "kinesis:PutRecords"
+        ]
+        Resource = aws_kinesis_stream.cloudfront_realtime_logs.arn
+      }
+    ]
+  })
 }

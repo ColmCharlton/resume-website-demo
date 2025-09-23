@@ -1,22 +1,45 @@
-// Paste all JS from <script>...</script> in index.html.tpl here
+
 // Backend URL - this variable will be replaced with the actual backend URL
 var backend_url = "${backend_api_url}";
 
-// Mobile menu toggle
-if (document.querySelector('.menu-toggle')) {
-    document.querySelector('.menu-toggle').addEventListener('click', function() {
-        document.querySelector('nav ul').classList.toggle('active');
-    });
-}
+// Section highlight in nav (if nav exists)
+document.addEventListener('DOMContentLoaded', function() {
+    // Highlight current section in view
+    if (window.IntersectionObserver) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    document.querySelectorAll('nav a').forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === `#${entry.target.id}`) {
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }, {threshold: 0.7});
+        document.querySelectorAll('section').forEach(section => {
+            observer.observe(section);
+        });
+    }
 
-// Close mobile menu when clicking on a link
-if (document.querySelectorAll('nav ul li a')) {
-    document.querySelectorAll('nav ul li a').forEach(link => {
-        link.addEventListener('click', () => {
-            document.querySelector('nav ul').classList.remove('active');
+    // Project view buttons (if any)
+    document.querySelectorAll('.view-project').forEach(button => {
+        button.addEventListener('click', function() {
+            const project = this.parentElement;
+            alert(`Opening project: ${project.querySelector('h3').textContent}`);
         });
     });
-}
+
+    // PDF export stub (if button exists)
+    if (document.getElementById('exportPDF')) {
+        document.getElementById('exportPDF').addEventListener('click', function() {
+            alert('PDF export functionality would be implemented here');
+        });
+    }
+
+    updateVisitorCount();
+});
 
 // Update visitor count
 async function updateVisitorCount() {
@@ -25,10 +48,6 @@ async function updateVisitorCount() {
         const response = await fetch(apiUrl);
         const data = await response.json();
         document.getElementById('visitorCount').textContent = data.count;
-        if (location.hash === '#admin') {
-            document.getElementById('analyticsSection').style.display = 'block';
-            renderVisitorChart(data.count);
-        }
     } catch (error) {
         console.error('Error fetching visitor count:', error);
         document.getElementById('visitorCount').textContent = 'Error';
@@ -67,54 +86,3 @@ if (document.getElementById('contactForm')) {
         }
     });
 }
-
-// Render visitor chart
-function renderVisitorChart(count) {
-    const ctx = document.getElementById('visitorChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: ['January', 'February', 'March', 'April', 'May', 'June'],
-            datasets: [{
-                label: 'Monthly Visitors',
-                data: [count/2, count/3, count/1.5, count/1.2, count/1.1, count],
-                backgroundColor: 'rgba(52, 152, 219, 0.2)',
-                borderColor: 'rgba(52, 152, 219, 1)',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    labels: {
-                        font: {
-                            size: 14
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    updateVisitorCount();
-});

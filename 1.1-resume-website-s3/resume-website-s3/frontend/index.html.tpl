@@ -48,9 +48,9 @@
                     <p>With over 5 years of experience in the tech industry, I've worked on various projects ranging from small business websites to enterprise-level applications. I'm always eager to learn new technologies and take on challenging projects.</p>
                     <p>When I'm not coding, you can find me hiking, reading tech blogs, or contributing to open-source projects. I believe in writing clean, maintainable code and following best practices in software development.</p>
                 </div>
-                <div class="about-img">
-                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80" alt="John Doe">
-                </div>
+                // <div class="about-img">
+                //     <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80" alt="John Doe">
+                // </div>
             </div>
         </div>
     </section>

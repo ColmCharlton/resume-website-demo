@@ -17,3 +17,7 @@ phases:
       - cd 1.1-resume-website-s3/resume-website-s3/lambda
       - npx --yes jest --ci --colors lambda/__tests__/lambda.test.js
       - cd -
+artifacts:
+  files:
+    - '**/*'
+  base-directory: dist

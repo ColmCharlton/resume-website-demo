@@ -48,6 +48,13 @@ This configuration provisions:
 - **SES** for email identity verification.
 - **CloudWatch Dashboard** for monitoring.
 - **CodePipeline** for CI/CD integration with GitHub.
+- **Kinesis Data Stream** for CloudFront real-time logging (CloudWatch Logs is not supported for real-time logs via Terraform).
+
+## CloudFront Logging Notes
+
+- **S3 Logging**: Not supported in new AWS accounts with ObjectOwnership=BucketOwnerEnforced. The S3 bucket for CloudFront logs is commented out in `main.tf`.
+- **Real-time Logging**: Configured to use a Kinesis Data Stream. Only supported fields are included in the log config. See `main.tf` for details.
+- **Unsupported Fields**: Only use fields supported by AWS for real-time logging. See AWS documentation for the latest list.
 
 ## Notes
 
