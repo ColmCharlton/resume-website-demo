@@ -1,0 +1,20 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      - echo Using AWS CLI to fetch API base URL from SSM
+  build:
+    commands:
+      - set -e
+      - REGION=${AWS_DEFAULT_REGION:-eu-west-1}
+      - API_BASE_URL=$(aws ssm get-parameter --name "/resume/api_base_url" --with-decryption --query Parameter.Value --output text --region "$REGION")
+      - echo "API_BASE_URL=$API_BASE_URL"
+      - mkdir -p dist
+      - SRC=s3-serverless/frontend
+      - cp "$SRC/styles.css" "dist/style.css"
+      - sed 's|\${backend_api_url}|$API_BASE_URL|g' "$SRC/index.html.tpl" > "dist/index.html"
+      - sed "s|\${backend_api_url}|$API_BASE_URL|g" "$SRC/scripts.js" > "dist/script.js"
+artifacts:
+  files:
+    - '**/*'
+  base-directory: dist

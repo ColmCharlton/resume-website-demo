@@ -1,0 +1,24 @@
+# Ansible Inventory Template
+# NOTE: This file is for LOCAL testing only!
+# The GitHub Actions workflow dynamically generates the 'inventory' file with current IP addresses
+# Copy this file to 'inventory' and update with your actual IP addresses for local testing
+
+[webservers]
+webserver ansible_host=YOUR_WEBSERVER_PRIVATE_IP ansible_user=ec2-user
+
+[bastions]
+bastion ansible_host=YOUR_BASTION_PUBLIC_IP ansible_user=ec2-user
+
+[all:vars]
+ansible_python_interpreter=auto_silent
+ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump=ec2-user@YOUR_BASTION_PUBLIC_IP
+ansible_ssh_retries=3
+
+# Example usage for LOCAL testing:
+# 1. Copy this file: cp inventory.template inventory
+# 2. Replace YOUR_WEBSERVER_PRIVATE_IP with actual private IP (e.g., 172.31.45.121)
+# 3. Replace YOUR_BASTION_PUBLIC_IP with actual public IP (e.g., 52.17.1.38)
+# 4. Run ansible: ansible-playbook -i inventory playbook.yml
+#
+# IMPORTANT: The GitHub Actions workflow automatically generates the inventory file
+# with current IP addresses, so manual updates are not needed for CI/CD

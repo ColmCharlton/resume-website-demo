@@ -1,0 +1,19 @@
+version: 0.2
+env:
+  variables:
+    NODE_ENV: test
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo "Installing Lambda test dependencies"
+      - cd s3-serverless/lambda
+      - npm ci
+      - cd -
+  build:
+    commands:
+      - echo "Running Jest unit tests for Lambdas"
+      - cd s3-serverless/lambda
+      - npx --yes jest --ci --colors __tests__/lambda.test.js
+      - cd -

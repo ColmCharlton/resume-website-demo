@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "aws-xray-sdk": "^3.10.3"
+  }
+}

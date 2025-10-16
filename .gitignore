@@ -1,0 +1,96 @@
+# Python Virtual Environments
+myenvec2/
+venv/
+env/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+terraform.tfplan
+tfplan
+
+# AWS
+.aws/
+*.pem
+*.key
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+*.log
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.continue/
+
+# Build artifacts
+*.zip
+dist/
+build/
+
+# Sensitive configuration
+secrets.yaml
+.env.local
+.env.production
+config.local.js
+
+# Ansible inventory with real IPs (keep local copy for testing)
+ec2-solution/ansible/inventory
+1.2-resume-website-ec2/resume-website-ec2/ansible/inventory
+
+# Lambda packages
+*.zip
+
+# Documentation drafts
+*.draft.md
+chat.py
+
+#misc
+*1.2-resume-website-ec2/recommendations/
+*1.2-resume-website-ec2/1.2 - EC2 Solution
+*1.2-resume-website-ec2/1.2 - EC2 Solution.md
+*1.0  Resume Website with Python, JavaScript.html.
+*1.0
+*1.2-resume-website-ec2
+*1.3-resume-website-eks
+*/docs

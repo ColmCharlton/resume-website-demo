@@ -1,0 +1,65 @@
+---
+- name: Repackage Lambda functions with dependencies
+  hosts: localhost
+  vars:
+    lambda_dirs:
+      - ../lambda/visitor-counter
+      - ../lambda/contact-form
+    lambda_zip_map:
+      visitor-counter: visitor-form.zip
+      contact-form: contact-form.zip
+  tasks:
+    - name: Install npm dependencies
+      ansible.builtin.command:
+        cmd: npm install
+        chdir: "{{ item }}"
+      loop: "{{ lambda_dirs }}"
+      register: npm_install_output
+      ignore_errors: false
+
+    - name: Show npm install output
+      ansible.builtin.debug:
+        var: npm_install_output
+
+
+    - name: Create deployment zip (Windows)
+      ansible.builtin.command:
+        cmd: >
+          powershell -Command "Compress-Archive -Path * -DestinationPath ../{{ item | basename }}/{{ item | basename == 'visitor-counter' | ternary('visitor-form.zip', 'contact-form.zip') }} -Force"
+        chdir: "{{ item }}"
+      loop: "{{ lambda_dirs }}"
+      when: ansible_os_family == 'Windows'
+
+    - name: Remove old zip file (Windows)
+      ansible.builtin.file:
+        path: "../{{ item | basename }}/{{ lambda_zip_map[item | basename] }}"
+        state: absent
+      loop: "{{ lambda_dirs }}"
+      when: ansible_os_family == 'Windows'
+
+    - name: Remove old zip file (Linux/Mac)
+      ansible.builtin.file:
+        path: "../{{ item | basename }}/{{ lambda_zip_map[item | basename] }}"
+        state: absent
+      loop: "{{ lambda_dirs }}"
+      when: ansible_os_family != 'Windows'
+
+    - name: Create deployment zip (Linux/Mac)
+      ansible.builtin.command:
+        cmd: >
+          zip -r ../{{ item | basename }}/{{ item | basename == 'visitor-counter' | ternary('visitor-form.zip', 'contact-form.zip') }} .
+        chdir: "{{ item }}"
+      loop: "{{ lambda_dirs }}"
+      when: ansible_os_family != 'Windows'
+
+    - name: Verify zip file exists
+      ansible.builtin.stat:
+        path: "../{{ item | basename }}/{{ lambda_zip_map[item | basename] }}"
+      register: zip_stat
+      loop: "{{ lambda_dirs }}"
+
+    - name: Fail if zip not created
+      ansible.builtin.fail:
+        msg: "Zip file for {{ item | basename }} was not created!"
+      when: not (zip_stat.results | selectattr('invocation.module_args.path', 'equalto', '../' + (item | basename) + '/' + lambda_zip_map[item | basename]) | map(attribute='stat.exists') | first | default(false))
+      loop: "{{ lambda_dirs }}"

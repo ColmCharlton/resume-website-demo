@@ -1,0 +1,19 @@
+[Unit]
+Description=Flask Resume Website
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/resume-website
+Environment=PATH=/home/ec2-user/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=/home/ec2-user/.local/lib/python3.8/site-packages:/usr/lib/python3.8/site-packages
+Environment=AWS_REGION=eu-west-1
+Environment=TABLE_NAME=ec2_ResumeVisitorCount
+ExecStart=/usr/bin/python3 /opt/resume-website/wsgi.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

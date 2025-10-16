@@ -1,0 +1,42 @@
+#!/bin/bash
+# SSL Certificate Setup Script
+# This script creates a self-signed SSL certificate for the nginx server
+
+# Variables
+CERT_DIR="/etc/ssl/certs"
+KEY_DIR="/etc/ssl/private"
+CERT_FILE="nginx-selfsigned.crt"
+KEY_FILE="nginx-selfsigned.key"
+DOMAIN="{{ domain_name }}"
+COUNTRY="IE"
+STATE="Dublin"
+CITY="Dublin"
+ORG="Resume"
+
+# Create directories if they don't exist
+sudo mkdir -p $CERT_DIR
+sudo mkdir -p $KEY_DIR
+
+# Generate self-signed certificate
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout $KEY_DIR/$KEY_FILE \
+    -out $CERT_DIR/$CERT_FILE \
+    -subj "/C=$COUNTRY/ST=$STATE/L=$CITY/O=$ORG/CN=$DOMAIN"
+
+# Set proper permissions
+sudo chmod 600 $KEY_DIR/$KEY_FILE
+sudo chmod 644 $CERT_DIR/$CERT_FILE
+
+# Verify certificate was created
+if [ -f "$CERT_DIR/$CERT_FILE" ] && [ -f "$KEY_DIR/$KEY_FILE" ]; then
+    echo "SSL certificate created successfully"
+    echo "Certificate: $CERT_DIR/$CERT_FILE"
+    echo "Private Key: $KEY_DIR/$KEY_FILE"
+    
+    # Display certificate information
+    echo "Certificate details:"
+    sudo openssl x509 -in $CERT_DIR/$CERT_FILE -text -noout | grep -E "(Subject|Issuer|Not Before|Not After)"
+else
+    echo "Error: SSL certificate creation failed"
+    exit 1
+fi

@@ -1,0 +1,195 @@
+---
+- name: Configure EC2 Resume Website
+  hosts: webservers
+  become: true
+  vars:
+    flask_app_port: 8000
+    domain_name: "yourdomain.com"
+    
+  tasks:
+    - name: Clean up previous failed installation
+      file:
+        path: /opt/resume-website
+        state: absent
+      become: true
+      tags: cleanup
+      
+    - name: Clean up user Python packages from previous failed install
+      file:
+        path: "{{ item }}"
+        state: absent
+      become: false
+      become_user: ec2-user
+      loop:
+        - /home/ec2-user/.local/lib/python3.8/site-packages/Flask*
+        - /home/ec2-user/.local/lib/python3.8/site-packages/boto3*
+        - /home/ec2-user/.cache/pip
+      tags: cleanup
+      ignore_errors: true
+        
+    - name: Update yum package index
+      command: yum update -y
+      
+    - name: Enable nginx repository
+      command: amazon-linux-extras enable nginx1
+      
+    - name: Install required system packages
+      command: yum install -y python38 python38-pip python38-setuptools nginx git
+          
+    - name: Create application directory
+      file:
+        path: /opt/resume-website
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        
+    - name: Copy main application files
+      copy:
+        src: "{{ item }}"
+        dest: /opt/resume-website/
+        owner: ec2-user
+        group: ec2-user
+        mode: '0644'
+      loop:
+        - ../wsgi.py
+        - ../requirements.txt
+        - ../config.py
+      tags: copy_files
+        
+    - name: Copy app directory
+      copy:
+        src: ../app/
+        dest: /opt/resume-website/app/
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+      tags: copy_files
+        
+    - name: Upgrade pip first
+      pip:
+        name: pip
+        state: latest
+        executable: pip3.8
+      become: true
+        
+    - name: Clean up any failed pip cache
+      file:
+        path: /home/ec2-user/.cache/pip
+        state: absent
+      become: false
+      become_user: ec2-user
+        
+    - name: Install Python requirements
+      pip:
+        requirements: /opt/resume-website/requirements.txt
+        executable: pip3.8
+        extra_args: --user --no-cache-dir
+      async: 300
+      poll: 5
+      become: false
+      become_user: ec2-user
+        
+    - name: Create Flask service file
+      template:
+        src: templates/flask-resume.service.j2
+        dest: /etc/systemd/system/flask-resume.service
+      notify: Reload systemd
+        
+    - name: Configure Nginx
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+      notify: Restart Nginx
+      
+    - name: Enable and start services
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      loop:
+        - nginx
+        - flask-resume
+        
+    # SSL Certificate Setup (Optional)
+    - name: Install OpenSSL for SSL certificate generation
+      ansible.builtin.package:
+        name: openssl
+        state: present
+      tags: ssl
+
+    - name: Create SSL directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/ssl/certs
+        - /etc/ssl/private
+      tags: ssl
+        
+    - name: Copy SSL setup script
+      template:
+        src: templates/ssl-setup.sh.j2
+        dest: /tmp/ssl-setup.sh
+        mode: '0755'
+      tags: ssl
+        
+    - name: Generate self-signed SSL certificate
+      script: /tmp/ssl-setup.sh
+      args:
+        creates: /etc/ssl/certs/nginx-selfsigned.crt
+      register: ssl_result
+      tags: ssl
+      
+    - name: Display SSL setup result
+      debug:
+        var: ssl_result.stdout_lines
+      when: ssl_result is defined
+      tags: ssl
+        
+    - name: Backup current nginx configuration
+      copy:
+        src: /etc/nginx/nginx.conf
+        dest: /etc/nginx/nginx.conf.backup
+        remote_src: yes
+        backup: yes
+      ignore_errors: true
+      tags: ssl
+        
+    - name: Configure Nginx with SSL
+      template:
+        src: templates/nginx-ssl.conf.j2
+        dest: /etc/nginx/nginx.conf
+      notify: 
+        - Test Nginx Config
+        - Restart Nginx
+      tags: ssl
+        
+    - name: Clean up SSL setup script
+      file:
+        path: /tmp/ssl-setup.sh
+        state: absent
+      tags: ssl
+        
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+        
+    - name: Test Nginx Config
+      command: nginx -t
+      register: nginx_test
+      failed_when: nginx_test.rc != 0
+        
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+        
+    - name: Restart Flask
+      service:
+        name: flask-resume
+        state: restarted

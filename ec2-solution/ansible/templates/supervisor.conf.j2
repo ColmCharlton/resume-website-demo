@@ -1,0 +1,9 @@
+[program:resume-website]
+command = /opt/resume-website/venv/bin/python /opt/resume-website/wsgi.py
+directory = /opt/resume-website
+user = ubuntu
+autostart = true
+autorestart = true
+stderr_logfile = /var/log/resume-website.err.log
+stdout_logfile = /var/log/resume-website.out.log
+environment = AWS_REGION="{{ aws_region }}"

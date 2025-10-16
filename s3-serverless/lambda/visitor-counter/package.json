@@ -1,0 +1,15 @@
+{
+  "name": "visitor-counter",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --ci --colors ../../__tests__/lambda.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "aws-xray-sdk": "^3.10.3"
+  }
+}
