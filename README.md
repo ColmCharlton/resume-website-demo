@@ -36,9 +36,10 @@ Each solution has its own README with detailed deployment instructions:
 
 ## 🔄 CI/CD Workflows
 
-GitHub Actions workflows are configured with **path filters** to only trigger when relevant code changes:
+AWS CodePipeline
+- **S3 Workflow** with buildspec files 
 
-- **S3 Workflow** (`.github/workflows/deploy-s3.yml`) - Triggers on `s3-serverless/**` changes
+GitHub Actions workflows are configured with **path filters** to only trigger when relevant code changes:
 - **EC2 Workflow** (`.github/workflows/deploy-ec2.yml`) - Triggers on `ec2-solution/**` changes
 - **EKS Workflow** (Coming Soon) - Will trigger on `eks-containerized/**` changes
 
@@ -77,10 +78,7 @@ cd s3-serverless    # or ec2-solution, eks-containerized
 ```
 
 ## 📚 Documentation
-
 - [`docs/architecture.md`](docs/architecture.md) - Detailed architecture diagrams
-- [`docs/deployment-guide.md`](docs/deployment-guide.md) - Step-by-step deployment
-- [`docs/best-practices.md`](docs/best-practices.md) - Security and optimization tips
 
 ## 🤝 Contributing
 
